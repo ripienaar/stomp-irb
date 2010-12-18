@@ -26,7 +26,7 @@ Current Subscriptions:
 >> recv_callback {|f| puts "Received: #{f.body} from #{f.headers["destination"]}"}
 >> topic "foo.bar", "hello"
 => nil
-&lt;&lt;stomp&gt;&gt hello
+&lt;&lt;stomp&gt;&gt; hello
 Received: hello from /topic/foo.bar
 </pre>
 
