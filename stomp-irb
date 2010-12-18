@@ -1,0 +1,174 @@
+#!/usr/bin/ruby
+
+# An interactive IRB like interface for STOMP
+
+require 'pp'
+require 'irb'
+
+def consolize(&block)
+    yield
+
+    IRB.setup(nil)
+    irb = IRB::Irb.new
+    IRB.conf[:MAIN_CONTEXT] = irb.context
+    irb.context.evaluate("require 'irb/completion'", 0)
+
+    install_alias_method :help, :stomp_help, IRB::ExtendCommandBundle::OVERRIDE_ALL
+
+    trap("SIGINT") do
+        irb.signal_handle
+    end
+    catch(:IRB_EXIT) do
+        irb.eval_input
+    end
+end
+
+def stomp_help
+    puts <<EOF
+    Interactive Ruby Shell for Stomp
+    ================================
+
+    subscribe :topic, "foo"   - subscribes to /topic/foo
+    unsubscribe :topic, "foo" - unsubscribes from /topic/foo
+    topic "foo", "hello"      - sends "hello" to /topic/foo
+    queue "foo", "hello"      - sends "hello" to /queue/foo
+    recv_callback{|f| pp f}   - dumps every received message using pp
+    verbose                   - shows timestamps and source of
+                                received messages
+    short_format "<format>"   - sets the short display format
+    long_format "<format>"    - sets the long display format
+
+    Display Formats:
+
+    You can set the display format used for showing incoming messages
+    the default long format is:
+
+        "<<%{time}:%{source}>> %{body}"
+
+    the default short format is:
+
+        "<<%{body}>>"
+
+EOF
+end
+
+def short_format(frm)
+    @options[:short_display_format] = frm
+end
+
+def long_format(frm)
+    @options[:long_display_format] = frm
+end
+
+def show_subscriptions
+    puts "Current Subscriptions:"
+    @connection.instance_variable_get("@subscriptions").keys.each do |s|
+        puts "\t#{s}"
+    end
+
+    puts
+end
+
+def unsubscribe(type, q)
+    @connection.unsubscribe("/#{type}/#{q}")
+    show_subscriptions
+end
+
+def subscribe(type, q)
+    @connection.subscribe("/#{type}/#{q}")
+    show_subscriptions
+end
+
+def verbose
+    @options[:verbose] ? @options[:verbose] = false : @options[:verbose] = true
+end
+
+def topic(dest, message)
+    @connection.publish("/topic/#{dest}", message)
+end
+
+def queue(dest, message)
+    @connection.publish("/queue/#{dest}", message)
+end
+
+def recv_callback(&blk)
+    if block_given?
+        @options[:callback] = blk
+    else
+        puts "ERROR: Need to pass a block into the callback"
+    end
+end
+
+def receive_and_print_loop
+    Thread.new(@connection) do |conn|
+        while true
+            begin
+                msg = conn.receive
+                dest = msg.headers["destination"]
+                time = Time.now.strftime('%H:%M:%S')
+
+                if @options[:verbose]
+                    txt = @options[:long_display_format].clone
+                else
+                    txt = @options[:short_display_format].clone
+                end
+
+                txt.gsub!(/%\{time\}/, time)
+                txt.gsub!(/%\{source\}/, dest)
+                txt.gsub!(/%\{body\}/, msg.body.chomp)
+
+                puts "\r#{txt}\n"
+
+                @options[:callback].call(msg)
+
+            rescue Exception => e
+                puts "Failed to receive from #{options[:stompserver]}: #{e.class}: #{e}"
+            end
+        end
+    end
+end
+
+consolize do
+    require 'rubygems'
+    require 'stomp'
+    require 'optparse'
+
+    @options = {}
+    @options[:stompserver] = ENV["STOMP_SERVER"] || "localhost"
+    @options[:stompport] = (ENV["STOMP_PORT"] || 61613).to_i
+    @options[:stompuser] = ENV["STOMP_USER"] || "guest"
+    @options[:stomppass] = ENV["STOMP_PASSWORD"] || "guest"
+    @options[:verbose] = false
+    @options[:long_display_format] = "<<%{time}:%{source}>> %{body}"
+    @options[:short_display_format] = "<<stomp>> %{body}"
+    @options[:callback] = Proc.new { true }
+
+    opt = OptionParser.new
+
+    opt.on("--server [SERVER]", "-s", "Server to connect to") do |val|
+        @options[:stompserver] = val
+    end
+
+    opt.on("--port [PORT]", "-p", Integer, "Port to connect to") do |val|
+        @options[:stompport] = val
+    end
+
+    opt.on("--user [USER]", "-u", "User to connect as") do |val|
+        @options[:stompuser] = val
+    end
+
+    opt.on("--password [PASSWORD]", "-P", "Password to connect with") do |val|
+        @options[:stomppass] = val
+    end
+
+    opt.parse!
+
+    @connection = Stomp::Connection.open(@options[:stompuser], @options[:stomppass], @options[:stompserver], @options[:stompport], true)
+
+    receive_and_print_loop
+
+    puts "Interactive Ruby shell for STOMP"
+    puts
+    puts "Type 'help' for usage instructions"
+    puts
+end
