@@ -84,11 +84,15 @@ def verbose
 end
 
 def topic(dest, message)
-    @connection.publish("/topic/#{dest}", message)
+    dest = "/topic/#{dest}"
+    @connection.publish(dest, message.to_s)
+    puts "Sent #{message.to_s} to #{dest}"
 end
 
 def queue(dest, message)
-    @connection.publish("/queue/#{dest}", message)
+    dest = "/queue/#{dest}"
+    @connection.publish(dest, message.to_s)
+    puts "Sent #{message.to_s} to #{dest}"
 end
 
 def recv_callback(&blk)
