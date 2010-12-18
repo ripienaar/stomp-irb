@@ -28,6 +28,12 @@ Current Subscriptions:
 => nil
 &lt;&lt;stomp&gt;&gt; hello
 Received: hello from /topic/foo.bar
+
+>> verbose
+=> true
+>> topic "foo.bar", "hello world"
+=> nil
+&lt;&lt;20:02:07:/topic/foo.bar&gt;&gt; hello world
 </pre>
 
 License?
