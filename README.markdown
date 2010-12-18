@@ -21,12 +21,12 @@ Current Subscriptions:
 => nil
 >> topic "foo.bar", "hello"
 => nil
-<<stomp>> hello
+&lt;&lt;stomp&gt;&gt; hello
 
 >> recv_callback {|f| puts "Received: #{f.body} from #{f.headers["destination"]}"}
 >> topic "foo.bar", "hello"
 => nil
-<<stomp>> hello
+&lt;&lt;stomp&gt;&gt hello
 Received: hello from /topic/foo.bar
 </pre>
 
