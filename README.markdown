@@ -38,4 +38,4 @@ Apache 2.0
 Contact?
 ========
 
-R.I.Pienaar <rip@devco.net>
+R.I.Pienaar &lt;rip@devco.net&gt; / @ripienaar / http://www.devco.net
