@@ -36,6 +36,11 @@ Received: hello from /topic/foo.bar
 &lt;&lt;20:02:07:/topic/foo.bar&gt;&gt; hello world
 </pre>
 
+Changelog?
+==========
+
+2011/01/20 - Add persistence support to queue sending
+
 License?
 ========
 

@@ -2,8 +2,12 @@
 
 # An interactive IRB like interface for STOMP
 
+require 'yaml'
+require 'rubygems'
+require 'stomp'
 require 'pp'
 require 'irb'
+require 'optparse'
 
 def consolize(&block)
     yield
@@ -28,15 +32,18 @@ def stomp_help
     Interactive Ruby Shell for Stomp
     ================================
 
-    subscribe :topic, "foo"   - subscribes to /topic/foo
-    unsubscribe :topic, "foo" - unsubscribes from /topic/foo
-    topic "foo", "hello"      - sends "hello" to /topic/foo
-    queue "foo", "hello"      - sends "hello" to /queue/foo
-    recv_callback{|f| pp f}   - dumps every received message using pp
-    verbose                   - shows timestamps and source of
-                                received messages
-    short_format "<format>"   - sets the short display format
-    long_format "<format>"    - sets the long display format
+    subscribe :topic, "foo"                     - subscribes to /topic/foo
+    unsubscribe :topic, "foo"                   - unsubscribes from /topic/foo
+    topic "foo", "hello"                        - sends "hello" to /topic/foo
+    topic "foo", "hello"                        - sends "hello" to /topic/foo
+    queue "foo", "hello"                        - sends "hello" to /queue/foo
+    queue "foo", "hello", {:persistent => true} - sends "hello" to /queue/foo
+                                                  and persist to storage
+    recv_callback{|f| pp f}                     - dumps every received message using pp
+    verbose                                     - shows timestamps and source of
+                                                  received messages
+    short_format "<format>"                     - sets the short display format
+    long_format "<format>"                      - sets the long display format
 
     Display Formats:
 
@@ -83,16 +90,22 @@ def verbose
     @options[:verbose] ? @options[:verbose] = false : @options[:verbose] = true
 end
 
-def topic(dest, message)
-    dest = "/topic/#{dest}"
-    @connection.publish(dest, message.to_s)
+def send_msg(dest, message)
+    if @connection.respond_to?(:publish)
+        @connection.publish(dest, message.to_s)
+    else
+        @connection.send(dest, message.to_s)
+    end
+
     puts "Sent #{message.to_s} to #{dest}"
 end
 
-def queue(dest, message)
-    dest = "/queue/#{dest}"
-    @connection.publish(dest, message.to_s)
-    puts "Sent #{message.to_s} to #{dest}"
+def topic(dest, message)
+    send_msg("/topic/#{dest}", message)
+end
+
+def queue(dest, message, opts={})
+    send_msg("/queue/#{dest}", message, opts)
 end
 
 def recv_callback(&blk)
@@ -133,9 +146,6 @@ def receive_and_print_loop
 end
 
 consolize do
-    require 'rubygems'
-    require 'stomp'
-    require 'optparse'
 
     @options = {}
     @options[:stompserver] = ENV["STOMP_SERVER"] || "localhost"
