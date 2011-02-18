@@ -90,11 +90,11 @@ def verbose
     @options[:verbose] ? @options[:verbose] = false : @options[:verbose] = true
 end
 
-def send_msg(dest, message)
+def send_msg(dest, message, opts={})
     if @connection.respond_to?(:publish)
-        @connection.publish(dest, message.to_s)
+        @connection.publish(dest, message.to_s, opts)
     else
-        @connection.send(dest, message.to_s)
+        @connection.send(dest, message.to_s, opts)
     end
 
     puts "Sent #{message.to_s} to #{dest}"
