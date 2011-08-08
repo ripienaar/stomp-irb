@@ -9,6 +9,20 @@ require 'pp'
 require 'irb'
 require 'optparse'
 
+class StompLogger
+    def on_connecting(params)
+        puts "info> Attempting to connect to stomp://%s@%s:%d" % [params[:cur_login], params[:cur_host], params[:cur_port]]
+    end
+
+    def on_connectfail(params)
+        puts "error> Connection to stomp://%s@%s:%d failed" % [params[:cur_login], params[:cur_host], params[:cur_port]]
+    end
+
+    def on_connected(params)
+        puts "info> Connected to stomp://%s@%s:%d" % [params[:cur_login], params[:cur_host], params[:cur_port]]
+    end
+end
+
 def consolize(&block)
     yield
 
@@ -76,13 +90,15 @@ def show_subscriptions
     puts
 end
 
-def unsubscribe(type, q)
-    @connection.unsubscribe("/#{type}/#{q}")
+def unsubscribe(type, q, headers={})
+    @connection.unsubscribe("/#{type}/#{q.to_s}", headers)
     show_subscriptions
 end
 
-def subscribe(type, q)
-    @connection.subscribe("/#{type}/#{q}")
+def subscribe(type, q, headers={})
+    dest = "/#{type}/#{q.to_s}"
+
+    @connection.subscribe(dest, headers)
     show_subscriptions
 end
 
@@ -90,22 +106,22 @@ def verbose
     @options[:verbose] ? @options[:verbose] = false : @options[:verbose] = true
 end
 
-def send_msg(dest, message, opts={})
+def send_msg(dest, message, headers={})
     if @connection.respond_to?(:publish)
-        @connection.publish(dest, message.to_s, opts)
+        @connection.publish(dest, message.to_s, headers)
     else
-        @connection.send(dest, message.to_s, opts)
+        @connection.send(dest, message.to_s, headers)
     end
 
-    puts "Sent #{message.to_s} to #{dest}"
+    puts "Sent #{message.to_s} to #{dest} with headers #{headers.pretty_inspect.chomp}"
 end
 
-def topic(dest, message)
-    send_msg("/topic/#{dest}", message)
+def topic(dest, message, headers={})
+    send_msg("/topic/#{dest}", message, headers)
 end
 
-def queue(dest, message, opts={})
-    send_msg("/queue/#{dest}", message, opts)
+def queue(dest, message, headers={})
+    send_msg("/queue/#{dest}", message, headers)
 end
 
 def recv_callback(&blk)
@@ -139,7 +155,7 @@ def receive_and_print_loop
                 @options[:callback].call(msg)
 
             rescue Exception => e
-                puts "Failed to receive from #{options[:stompserver]}: #{e.class}: #{e}"
+                puts "error> Failed to receive from #{options[:stompserver]}: #{e.class}: #{e}"
             end
         end
     end
@@ -177,11 +193,15 @@ consolize do
 
     opt.parse!
 
-    @connection = Stomp::Connection.open(@options[:stompuser], @options[:stomppass], @options[:stompserver], @options[:stompport], true)
+    connection = {:hosts => [
+        {:login => @options[:stompuser], :passcode => @options[:stomppass], :host => @options[:stompserver], :port => @options[:stompport]}
+    ], :logger => StompLogger.new}
 
     receive_and_print_loop
 
     puts "Interactive Ruby shell for STOMP"
+    puts
+    @connection = Stomp::Connection.open(connection)
     puts
     puts "Type 'help' for usage instructions"
     puts
