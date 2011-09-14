@@ -197,12 +197,12 @@ consolize do
         {:login => @options[:stompuser], :passcode => @options[:stomppass], :host => @options[:stompserver], :port => @options[:stompport]}
     ], :logger => StompLogger.new}
 
-    receive_and_print_loop
-
     puts "Interactive Ruby shell for STOMP"
     puts
     @connection = Stomp::Connection.open(connection)
     puts
     puts "Type 'help' for usage instructions"
     puts
+
+    receive_and_print_loop
 end
