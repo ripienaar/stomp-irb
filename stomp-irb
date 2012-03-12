@@ -21,6 +21,10 @@ class StompLogger
     def on_connected(params)
         puts "info> Connected to stomp://%s@%s:%d" % [params[:cur_login], params[:cur_host], params[:cur_port]]
     end
+
+    def on_miscerr(params, errstr)
+      puts "error> Unknown error on stomp connection stomp://%s@%s:%d: %s" % [params[:cur_login], params[:cur_host], params[:cur_port], errstr]
+    end
 end
 
 def consolize(&block)
