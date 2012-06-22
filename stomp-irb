@@ -10,43 +10,44 @@ require 'irb'
 require 'optparse'
 
 class StompLogger
-    def on_connecting(params)
-        puts "info> Attempting to connect to stomp://%s@%s:%d" % [params[:cur_login], params[:cur_host], params[:cur_port]]
-    end
+  def on_connecting(params)
+    puts "info> Attempting to connect to stomp://%s@%s:%d" % [params[:cur_login], params[:cur_host], params[:cur_port]]
+  end
 
-    def on_connectfail(params)
-        puts "error> Connection to stomp://%s@%s:%d failed" % [params[:cur_login], params[:cur_host], params[:cur_port]]
-    end
+  def on_connectfail(params)
+    puts "error> Connection to stomp://%s@%s:%d failed" % [params[:cur_login], params[:cur_host], params[:cur_port]]
+  end
 
-    def on_connected(params)
-        puts "info> Connected to stomp://%s@%s:%d" % [params[:cur_login], params[:cur_host], params[:cur_port]]
-    end
+  def on_connected(params)
+    puts "info> Connected to stomp://%s@%s:%d" % [params[:cur_login], params[:cur_host], params[:cur_port]]
+  end
 
-    def on_miscerr(params, errstr)
-      puts "error> Unknown error on stomp connection stomp://%s@%s:%d: %s" % [params[:cur_login], params[:cur_host], params[:cur_port], errstr]
-    end
+  def on_miscerr(params, errstr)
+    puts "error> Unknown error on stomp connection stomp://%s@%s:%d: %s" % [params[:cur_login], params[:cur_host], params[:cur_port], errstr]
+  end
 end
 
 def consolize(&block)
-    yield
+  yield
 
-    IRB.setup(nil)
-    irb = IRB::Irb.new
-    IRB.conf[:MAIN_CONTEXT] = irb.context
-    irb.context.evaluate("require 'irb/completion'", 0)
+  IRB.setup(nil)
+  irb = IRB::Irb.new
+  IRB.conf[:MAIN_CONTEXT] = irb.context
+  irb.context.evaluate("require 'irb/completion'", 0)
 
-    install_alias_method :help, :stomp_help, IRB::ExtendCommandBundle::OVERRIDE_ALL
+  install_alias_method :help, :stomp_help, IRB::ExtendCommandBundle::OVERRIDE_ALL
 
-    trap("SIGINT") do
-        irb.signal_handle
-    end
-    catch(:IRB_EXIT) do
-        irb.eval_input
-    end
+  trap("SIGINT") do
+    irb.signal_handle
+  end
+
+  catch(:IRB_EXIT) do
+    irb.eval_input
+  end
 end
 
 def stomp_help
-    puts <<EOF
+  puts <<EOF
     Interactive Ruby Shell for Stomp
     ================================
 
@@ -78,135 +79,135 @@ EOF
 end
 
 def short_format(frm)
-    @options[:short_display_format] = frm
+  @options[:short_display_format] = frm
 end
 
 def long_format(frm)
-    @options[:long_display_format] = frm
+  @options[:long_display_format] = frm
 end
 
 def show_subscriptions
-    puts "Current Subscriptions:"
-    @connection.instance_variable_get("@subscriptions").keys.each do |s|
-        puts "\t#{s}"
-    end
+  puts "Current Subscriptions:"
+  @connection.instance_variable_get("@subscriptions").keys.each do |s|
+    puts "\t#{s}"
+  end
 
-    puts
+  puts
 end
 
 def unsubscribe(type, q, headers={})
-    @connection.unsubscribe("/#{type}/#{q.to_s}", headers)
-    show_subscriptions
+  @connection.unsubscribe("/#{type}/#{q.to_s}", headers)
+  show_subscriptions
 end
 
 def subscribe(type, q, headers={})
-    dest = "/#{type}/#{q.to_s}"
+  dest = "/#{type}/#{q.to_s}"
 
-    @connection.subscribe(dest, headers)
-    show_subscriptions
+  @connection.subscribe(dest, headers)
+  show_subscriptions
 end
 
 def verbose
-    @options[:verbose] ? @options[:verbose] = false : @options[:verbose] = true
+  @options[:verbose] ? @options[:verbose] = false : @options[:verbose] = true
 end
 
 def send_msg(dest, message, headers={})
-    if @connection.respond_to?(:publish)
-        @connection.publish(dest, message.to_s, headers)
-    else
-        @connection.send(dest, message.to_s, headers)
-    end
+  if @connection.respond_to?(:publish)
+    @connection.publish(dest, message.to_s, headers)
+  else
+    @connection.send(dest, message.to_s, headers)
+  end
 
-    puts "Sent #{message.to_s} to #{dest} with headers #{headers.pretty_inspect.chomp}"
+  puts "Sent #{message.to_s} to #{dest} with headers #{headers.pretty_inspect.chomp}"
 end
 
 def topic(dest, message, headers={})
-    send_msg("/topic/#{dest}", message, headers)
+  send_msg("/topic/#{dest}", message, headers)
 end
 
 def queue(dest, message, headers={})
-    send_msg("/queue/#{dest}", message, headers)
+  send_msg("/queue/#{dest}", message, headers)
 end
 
 def recv_callback(&blk)
-    if block_given?
-        @options[:callback] = blk
-    else
-        puts "ERROR: Need to pass a block into the callback"
-    end
+  if block_given?
+    @options[:callback] = blk
+  else
+    puts "ERROR: Need to pass a block into the callback"
+  end
 end
 
 def receive_and_print_loop
-    Thread.new(@connection) do |conn|
-        while true
-            begin
-                msg = conn.receive
-                dest = msg.headers["destination"]
-                time = Time.now.strftime('%H:%M:%S')
+  Thread.new(@connection) do |conn|
+    while true
+      begin
+        msg = conn.receive
+        dest = msg.headers["destination"]
+        time = Time.now.strftime('%H:%M:%S')
 
-                if @options[:verbose]
-                    txt = @options[:long_display_format].clone
-                else
-                    txt = @options[:short_display_format].clone
-                end
-
-                txt.gsub!(/%\{time\}/, time)
-                txt.gsub!(/%\{source\}/, dest)
-                txt.gsub!(/%\{body\}/, msg.body.chomp)
-
-                puts "\r#{txt}\n"
-
-                @options[:callback].call(msg)
-
-            rescue Exception => e
-                puts "error> Failed to receive from #{options[:stompserver]}: #{e.class}: #{e}"
-            end
+        if @options[:verbose]
+          txt = @options[:long_display_format].clone
+        else
+          txt = @options[:short_display_format].clone
         end
+
+        txt.gsub!(/%\{time\}/, time)
+        txt.gsub!(/%\{source\}/, dest)
+        txt.gsub!(/%\{body\}/, msg.body.chomp)
+
+        puts "\r#{txt}\n"
+
+        @options[:callback].call(msg)
+
+      rescue Exception => e
+        puts "error> Failed to receive from #{options[:stompserver]}: #{e.class}: #{e}"
+      end
     end
+  end
 end
 
 consolize do
 
-    @options = {}
-    @options[:stompserver] = ENV["STOMP_SERVER"] || "localhost"
-    @options[:stompport] = (ENV["STOMP_PORT"] || 61613).to_i
-    @options[:stompuser] = ENV["STOMP_USER"] || "guest"
-    @options[:stomppass] = ENV["STOMP_PASSWORD"] || "guest"
-    @options[:verbose] = false
-    @options[:long_display_format] = "<<%{time}:%{source}>> %{body}"
-    @options[:short_display_format] = "<<stomp>> %{body}"
-    @options[:callback] = Proc.new { true }
+  @options = {}
+  @options[:stompserver] = ENV["STOMP_SERVER"] || "localhost"
+  @options[:stompport] = (ENV["STOMP_PORT"] || 61613).to_i
+  @options[:stompuser] = ENV["STOMP_USER"] || "guest"
+  @options[:stomppass] = ENV["STOMP_PASSWORD"] || "guest"
+  @options[:verbose] = false
+  @options[:long_display_format] = "<<%{time}:%{source}>> %{body}"
+  @options[:short_display_format] = "<<stomp>> %{body}"
+  @options[:callback] = Proc.new { true }
 
-    opt = OptionParser.new
+  opt = OptionParser.new
 
-    opt.on("--server [SERVER]", "-s", "Server to connect to") do |val|
-        @options[:stompserver] = val
-    end
+  opt.on("--server [SERVER]", "-s", "Server to connect to") do |val|
+    @options[:stompserver] = val
+  end
 
-    opt.on("--port [PORT]", "-p", Integer, "Port to connect to") do |val|
-        @options[:stompport] = val
-    end
+  opt.on("--port [PORT]", "-p", Integer, "Port to connect to") do |val|
+    @options[:stompport] = val
+  end
 
-    opt.on("--user [USER]", "-u", "User to connect as") do |val|
-        @options[:stompuser] = val
-    end
+  opt.on("--user [USER]", "-u", "User to connect as") do |val|
+    @options[:stompuser] = val
+  end
 
-    opt.on("--password [PASSWORD]", "-P", "Password to connect with") do |val|
-        @options[:stomppass] = val
-    end
+  opt.on("--password [PASSWORD]", "-P", "Password to connect with") do |val|
+    @options[:stomppass] = val
+  end
 
-    opt.parse!
+  opt.parse!
 
-    connection = {:hosts => [
-        {:login => @options[:stompuser], :passcode => @options[:stomppass], :host => @options[:stompserver], :port => @options[:stompport]}
-    ], :logger => StompLogger.new}
+  connection = {:hosts => [
+    {:login => @options[:stompuser], :passcode => @options[:stomppass], :host => @options[:stompserver], :port => @options[:stompport]}
+  ], :logger => StompLogger.new}
 
-    puts "Interactive Ruby shell for STOMP"
-    puts
-    @connection = Stomp::Connection.open(connection)
-    puts
-    puts "Type 'help' for usage instructions"
-    puts
+  puts "Interactive Ruby shell for STOMP"
+  puts
+  @connection = Stomp::Connection.open(connection)
+  puts
+  puts "Type 'help' for usage instructions"
+  puts
 
-    receive_and_print_loop
+  receive_and_print_loop
 end
