@@ -11,19 +11,27 @@ require 'optparse'
 
 class StompLogger
   def on_connecting(params)
-    puts "info> Attempting to connect to stomp://%s@%s:%d" % [params[:cur_login], params[:cur_host], params[:cur_port]]
+    puts "info> Attempting to connect to %s" % stomp_url(params)
   end
 
   def on_connectfail(params)
-    puts "error> Connection to stomp://%s@%s:%d failed" % [params[:cur_login], params[:cur_host], params[:cur_port]]
+    puts "error> Connection to %s failed" % stomp_url(params)
+  end
+
+  def on_connectfail(params)
+    puts "info> Disconnected from %s" % stomp_url(params)
   end
 
   def on_connected(params)
-    puts "info> Connected to stomp://%s@%s:%d" % [params[:cur_login], params[:cur_host], params[:cur_port]]
+    puts "info> Connected to %s" % stomp_url(params)
   end
 
   def on_miscerr(params, errstr)
-    puts "error> Unknown error on stomp connection stomp://%s@%s:%d: %s" % [params[:cur_login], params[:cur_host], params[:cur_port], errstr]
+    puts "error> Unknown error on stomp connection %s: %s" % [stomp_url(params), errstr]
+  end
+
+  def stomp_url(params)
+    "%s://%s@%s:%d" % [ params[:cur_ssl] ? "stomp+ssl" : "stomp", params[:cur_login], params[:cur_host], params[:cur_port]]
   end
 end
 
@@ -96,14 +104,17 @@ def show_subscriptions
 end
 
 def unsubscribe(type, q, headers={})
-  @connection.unsubscribe("/#{type}/#{q.to_s}", headers)
+  @connection.unsubscribe("/#{type}/#{q}", headers)
   show_subscriptions
 end
 
 def subscribe(type, q, headers={})
-  dest = "/#{type}/#{q.to_s}"
+  dest = "/#{type}/#{q}"
 
-  @connection.subscribe(dest, headers)
+  @connection.subscribe(dest, {:id => @next_subscription_id}.merge(headers))
+
+  @next_subscription_id += 1
+
   show_subscriptions
 end
 
@@ -177,6 +188,9 @@ consolize do
   @options[:long_display_format] = "<<%{time}:%{source}>> %{body}"
   @options[:short_display_format] = "<<stomp>> %{body}"
   @options[:callback] = Proc.new { true }
+  @options[:heartbeat_interval] = "30000"
+
+  @next_subscription_id = 0
 
   opt = OptionParser.new
 
@@ -196,11 +210,15 @@ consolize do
     @options[:stomppass] = val
   end
 
+  opt.on("--heartbeat-interval [INTERVAL]", "-i", "Interval for Stomp 1.1 heartbeats") do |val|
+    @options[:heartbeat_interval] = val
+  end
+
   opt.parse!
 
-  connection = {:hosts => [
-    {:login => @options[:stompuser], :passcode => @options[:stomppass], :host => @options[:stompserver], :port => @options[:stompport]}
-  ], :logger => StompLogger.new}
+  connection = {:hosts => [ {:login => @options[:stompuser], :passcode => @options[:stomppass], :host => @options[:stompserver], :port => @options[:stompport]} ],
+                :logger => StompLogger.new,
+                :connect_headers => {:"heart-beat" => "#{@options[:heartbeat_interval]},#{@options[:heartbeat_interval]}", :host => @options[:stompserver], :"accept-version" => "1.1,1.0"}}
 
   puts "Interactive Ruby shell for STOMP"
   puts
