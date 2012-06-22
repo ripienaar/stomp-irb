@@ -104,14 +104,31 @@ def show_subscriptions
 end
 
 def unsubscribe(type, q, headers={})
-  @connection.unsubscribe("/#{type}/#{q}", headers)
+  dest = "/#{type}/#{q}"
+
+  unless @subscriptions[dest]
+    puts "error> Not currently subscribed to #{dest}"
+    return false
+  end
+
+  @connection.unsubscribe("/#{type}/#{q}", {:id => @subscriptions[dest][:id]}.merge(headers))
+
+  @subscriptions.delete(dest)
+
   show_subscriptions
 end
 
 def subscribe(type, q, headers={})
   dest = "/#{type}/#{q}"
 
+  if @subscriptions[dest]
+    puts "error> Already subscribed to #{dest}"
+    return false
+  end
+
   @connection.subscribe(dest, {:id => @next_subscription_id}.merge(headers))
+
+  @subscriptions[dest] = {:id => @next_subscription_id}
 
   @next_subscription_id += 1
 
@@ -190,6 +207,7 @@ consolize do
   @options[:callback] = Proc.new { true }
   @options[:heartbeat_interval] = "30000"
 
+  @subscriptions = {}
   @next_subscription_id = 0
 
   opt = OptionParser.new
