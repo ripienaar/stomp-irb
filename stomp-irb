@@ -206,6 +206,7 @@ consolize do
   @options[:short_display_format] = "<<stomp>> %{body}"
   @options[:callback] = Proc.new { true }
   @options[:heartbeat_interval] = "30000"
+  @options[:vhost] = nil
 
   @subscriptions = {}
   @next_subscription_id = 0
@@ -232,11 +233,15 @@ consolize do
     @options[:heartbeat_interval] = val
   end
 
+  opt.on("--vhost [VHOST]", "-V", "Vhost used by RabbitMQ") do |val|
+    @options[:vhost] = val
+  end
+
   opt.parse!
 
   connection = {:hosts => [ {:login => @options[:stompuser], :passcode => @options[:stomppass], :host => @options[:stompserver], :port => @options[:stompport]} ],
                 :logger => StompLogger.new,
-                :connect_headers => {:"heart-beat" => "#{@options[:heartbeat_interval]},#{@options[:heartbeat_interval]}", :host => @options[:stompserver], :"accept-version" => "1.1,1.0"}}
+                :connect_headers => {:"heart-beat" => "#{@options[:heartbeat_interval]},#{@options[:heartbeat_interval]}",  :"accept-version" => "1.1,1.0", :host => @options[:vhost] || @options[:stompserver] }}
 
   puts "Interactive Ruby shell for STOMP"
   puts
